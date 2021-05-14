@@ -14,7 +14,7 @@ pipeline {
         SOURCE_CONTEXT_DIR = ""
         IMAGE_TAG = "latest"
         PROTOBIN_CONTEXT_DIR = "target/protobin/"
-        UBER_JAR_FILE="target/${APP_NAME}-6.1.1-SNAPSHOT.jar"
+        UBER_JAR_FILE="target/${APP_NAME}-6.1.1.jar"
         REPO_KEY = "${ENVIRONMENT_NAME}-images"
         ARTIFACTORY_REPO = "omnitracs-${REPO_KEY}.jfrog.io"
         ARTIFACTORY_PATH = "platform"

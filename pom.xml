@@ -11,7 +11,6 @@
 	</parent>
 
 	<artifactId>device-scheduler</artifactId>
-	<version>6.1.1</version>
 
 	<properties>
 		<sonar.exclusions>**/interceptor/*, **/*SchedulerApplication.java</sonar.exclusions>

@@ -1,0 +1,17 @@
+﻿apiVersion: autoscaling/v2beta1
+kind: HorizontalPodAutoscaler
+metadata:
+  name: device-scheduler
+  namespace: devices-perf
+spec:
+  scaleTargetRef:
+    apiVersion: apps.openshift.io/v1
+    kind: DeploymentConfig
+    name: device-scheduler
+  minReplicas: 3
+  maxReplicas: 5
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        targetAverageUtilization: 60

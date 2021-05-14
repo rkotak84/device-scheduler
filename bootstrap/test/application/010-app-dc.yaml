@@ -1,0 +1,150 @@
+---
+apiVersion: v1
+kind: DeploymentConfig
+metadata:
+  name: "device-scheduler"
+  labels:
+    app: "device-scheduler"
+  namespace: "devices-test"
+spec:
+  replicas: 2
+  selector:
+    name: "device-scheduler"
+  strategy:
+    activeDeadlineSeconds: 21600
+    resources: {}
+    rollingParams:
+      intervalSeconds: 1
+      maxSurge: 25%
+      maxUnavailable: 25%
+      timeoutSeconds: 600
+      updatePeriodSeconds: 1
+    type: Rolling
+  template:
+    metadata:
+      labels:
+        name: "device-scheduler"
+    spec:
+      initContainers:
+      - args:
+        - -c
+        - openssl pkcs8 -topk8 -nocrypt -in /tmp/sslcert/tls.key -out
+            /tmp/sslcert-converted/tls.key && cp
+            /var/run/secrets/kubernetes.io/serviceaccount/service-ca.crt
+            /usr/share/pki/ca-trust-source/anchors && mkdir -p
+            /etc/pki/ca-trust/extracted/pem
+            /etc/pki/ca-trust/extracted/openssl
+            /etc/pki/ca-trust/extracted/java && update-ca-trust
+        command:
+        - /bin/bash
+        image: rhel7/support-tools:7.6
+        imagePullPolicy: IfNotPresent
+        name: convert-cert
+        resources:
+          limits:
+            cpu: 100m 
+            memory: 256Mi
+        terminationMessagePath: /dev/termination-log
+        terminationMessagePolicy: File
+        volumeMounts:
+        - mountPath: /tmp/sslcert
+          name: volume-serving-cert
+          readOnly: true
+        - mountPath: /tmp/sslcert-converted
+          name: converted-cert
+        - mountPath: /usr/share/pki/ca-trust-source/anchors
+          name: ca-anchors
+        - mountPath: /etc/pki/ca-trust/extracted
+          name: ca-extracted
+      - resources: {}
+        terminationMessagePath: /dev/termination-log
+        imagePullPolicy: Always
+        terminationMessagePolicy: File
+        image: 'omnitracs-base-remote-images-virt.jfrog.io/ubi7-minimal:7.8'
+      containers:
+      - env:
+        - name: JAVA_OPTIONS
+          value: >-
+            -javaagent:/usr/share/dd-java-agent.jar -Dspring.config.location=file:///deployments/config/
+        - name: GC_MAX_METASPACE_SIZE
+          value: '200'
+        imagePullPolicy: Always
+        name: "device-scheduler"
+        volumeMounts:
+        - mountPath: /tmp/sslcert
+          name: volume-serving-cert
+          readOnly: true
+        - mountPath: /tmp/sslcert-converted
+          name: converted-cert
+        - mountPath: /usr/share/pki/ca-trust-source/anchors
+          name: ca-anchors
+        - mountPath: /etc/pki/ca-trust/extracted
+          name: ca-extracted
+        - name: application-properties
+          mountPath: /deployments/config
+        ports:
+        - containerPort: 8080
+          name: http
+          protocol: TCP
+        resources:
+          limits:
+            cpu: 700m
+            memory: "768Mi"
+          requests:
+            cpu: 100m
+            memory: "256Mi"
+        terminationMessagePath: "/dev/termination-log"
+        readinessProbe:
+          httpGet:
+            path: "/actuator/health"
+            port: 8081
+            scheme: HTTP
+          initialDelaySeconds: 30
+          timeoutSeconds: 3
+          periodSeconds: 90
+        livenessProbe:
+          httpGet:
+            path: "/actuator/health"
+            port: 8081
+            scheme: HTTP
+          initialDelaySeconds: 30
+          timeoutSeconds: 3
+          periodSeconds: 90
+      dnsPolicy: ClusterFirst
+      restartPolicy: Always
+      serviceAccount: vault-auth
+      imagePullSecrets:
+        - name: baseimagepull-registry-creds
+      securityContext: {}
+      terminationGracePeriodSeconds: 30
+      volumes:
+      - emptyDir: {}
+        name: converted-cert
+      - name: volume-serving-cert
+        secret:
+          defaultMode: 420
+          secretName: "device-scheduler-serving-cert"
+      - emptyDir: {}
+        name: ca-anchors
+      - emptyDir: {}
+        name: ca-extracted
+      - name: application-properties
+        configMap:
+          name: device-scheduler-properties
+          items:
+            - key: application.yml
+              path: application.yml
+            - key: bootstrap.yml
+              path: bootstrap.yml
+  test: false
+  triggers:
+  - type: ConfigChange
+  - imageChangeParams:
+      automatic: true
+      containerNames:
+      - "device-scheduler"
+      from:
+        kind: ImageStreamTag
+        name: "device-scheduler:latest"
+    type: ImageChange
+...

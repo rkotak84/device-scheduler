@@ -1,0 +1,34 @@
+kind: BuildConfig
+apiVersion: build.openshift.io/v1
+metadata:
+  name: device-scheduler-pipeline
+  namespace: devices-ci-cd
+  labels:
+    app: device-scheduler
+    build: device-scheduler
+    name: device-scheduler-pipeline
+    type: pipeline
+spec:
+  nodeSelector: {}
+  output: {}
+  resources: {}
+  successfulBuildsHistoryLimit: 5
+  failedBuildsHistoryLimit: 5
+  strategy:
+    type: JenkinsPipeline
+    jenkinsPipelineStrategy:
+      jenkinsfilePath: bootstrap/prod/pipeline/Jenkinsfile
+  postCommit: {}
+  source:
+    type: Git
+    git:
+      uri: 'git@github.com:Omnitracs/app.product.service.device-integration.git'
+      ref: develop
+    sourceSecret:
+      name: jenkins-github-ssh
+  triggers:
+    - type: Generic
+      generic:
+        secret: Ym3SJsOxQlHlNDS0ERPe
+        allowEnv: true
+  runPolicy: Serial

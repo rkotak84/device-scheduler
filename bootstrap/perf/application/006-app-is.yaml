@@ -1,0 +1,23 @@
+---
+apiVersion: v1
+kind: ImageStream
+metadata:
+  labels:
+    app: "device-scheduler"
+    build: "device-scheduler"
+  name: "device-scheduler"
+  namespace: "devices-perf"
+spec:
+  lookupPolicy:
+    local: false
+  tags:
+  - annotations: null
+    from:
+      kind: DockerImage
+      name: omnitracs-perf-images.jfrog.io/platform/device-scheduler:latest
+    importPolicy:
+      scheduled: true
+    name: latest
+    referencePolicy:
+      type: Source
+...

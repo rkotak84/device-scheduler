@@ -1,0 +1,133 @@
+#!/usr/bin/groovy
+
+pipeline {
+
+   agent { label 'jenkins-slave-mvn' }
+
+    environment {
+        CONTEXT_NAME = "devices"
+        APP_NAME = "device-scheduler"
+
+        ENVIRONMENT_NAME = "dev"
+        CI_CD_NAMESPACE = "${CONTEXT_NAME}-ci-cd"
+        APP_NAMESPACE = "${CONTEXT_NAME}"
+        SOURCE_CONTEXT_DIR = ""
+        IMAGE_TAG = "latest"
+        PROTOBIN_CONTEXT_DIR = "target/protobin/"
+        UBER_JAR_FILE="target/${APP_NAME}-6.1.1-SNAPSHOT.jar"
+        REPO_KEY = "${ENVIRONMENT_NAME}-images"
+        ARTIFACTORY_REPO = "omnitracs-${REPO_KEY}.jfrog.io"
+        ARTIFACTORY_PATH = "platform"
+        ARTIFACTORY_SECRET_NAME = "${CI_CD_NAMESPACE}-artifactory-access-token"
+    }
+
+    options {
+        buildDiscarder(logRotator(numToKeepStr:'5'))
+        timeout(time: 60, unit: 'MINUTES')
+        //ansiColor('xterm')
+        //timestamps()
+    }
+    
+   stages{
+
+        stage("Build, Bake, and Deploy") {
+
+            stages{
+                stage('Build'){
+                    steps{
+                        // adding -e for debugging
+                        sh "mvn clean package -DskipTests -e -B -Dorg.slf4j.simpleLogger.log.org.apache.maven.cli.transfer.Slf4jMavenTransferListener=warn"
+                    }
+                }
+                
+                stage('Bake'){
+                    steps{
+                        script{
+                            openshift.loglevel(5)
+                            timeout(20) { // in minutes
+                                // ARTIFACTORY BAKE: Service
+                                // patch
+                                def patchArgs = [
+                                    namespace: "${env.CI_CD_NAMESPACE}", 
+                                    run_display_url: "${env.RUN_DISPLAY_URL}", 
+                                    build_number: "${env.BUILD_NUMBER}", 
+                                    git_url: "${env.GIT_URL}", 
+                                    git_commit: "${env.IMAGE_TAG}", 
+                                    artifactory_repo: "${env.ARTIFACTORY_REPO}", 
+                                    repo_key: "${env.REPO_KEY}", 
+                                    artifactory_folder: "${env.ARTIFACTORY_PATH}", 
+                                    app_name: "${env.APP_NAME}"]
+                                //this will allow the version+shortGitCommit image tag to be pushed to Artifactory instead of latest
+                                def serviceImageTag = patchArtifactoryBuildConfigOutputAndLabels(patchArgs)
+
+                                echo "Using image version: ${serviceImageTag}"
+
+                                // push
+                                openshift.withCluster () {
+                                    def buildSelector = openshift.startBuild( "${APP_NAME} --from-file=${UBER_JAR_FILE}" )
+                                    buildSelector.logs('-f')
+                                }
+
+                                // verify push success
+                                def checkExistsArgs = [
+									artifactorySecretName: "${ARTIFACTORY_SECRET_NAME}", 
+									dockerRepository: "${ARTIFACTORY_PATH}/${APP_NAME}", 
+									repo: "${REPO_KEY}", 
+									tag: "${IMAGE_TAG}"]
+								
+                                if(!artifactoryDockerImageExists(checkExistsArgs)){
+                                    error("Image push failed to Artifactory!");
+                                }
+                                
+
+                                // OPENSHIFT TAG: Service & Proxy
+                                // Artifactory commit tag -> ImageStream latest
+                                openshift.withCluster () {
+                                    openshift.withProject("${APP_NAMESPACE}") {
+                                        //Tag the artifactory dev image into the image stream.
+                                        openshift.tag("${ARTIFACTORY_REPO}/${ARTIFACTORY_PATH}/${APP_NAME}:${serviceImageTag} ${APP_NAMESPACE}/${APP_NAME}:latest")
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                stage('Deploy: Dev'){
+
+                    steps {
+                        script{
+                            openshift.withCluster() {
+                                openshift.withProject("${APP_NAMESPACE}") {
+                                    openshift.raw("apply -f ${env.WORKSPACE}/bootstrap/${ENVIRONMENT_NAME}/application")
+                                }
+                            }
+                        }
+                    }
+                }
+                stage("Verify Deployment"){
+                    steps{
+                        script {
+                            timeout(10) { // in minutes
+                                sleep 10
+                                verifyDeployment("${APP_NAME}", "${APP_NAMESPACE}")
+                            }
+                        }
+                    }
+                }
+            }            
+        }       
+    }
+
+	post {
+		success {
+		  echo "Success"
+		  slackSend color: "good", message: ":success: ${APP_NAME} Build Completed Successfully !! - ${JOB_NAME} ${BUILD_NUMBER} (<${BUILD_URL}|Open>)"
+		}
+
+		failure {
+		  echo "Failed"
+		  slackSend color: "warning", message: ":failure: ${APP_NAME} Build Failed! - ${JOB_NAME} ${BUILD_NUMBER} (<${BUILD_URL}console|Open>)"
+		}
+  }
+}

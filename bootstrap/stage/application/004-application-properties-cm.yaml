@@ -1,0 +1,94 @@
+kind: ConfigMap
+apiVersion: v1
+metadata:
+  labels:
+    app: device-scheduler
+  name: device-scheduler-properties
+  namespace: devices-stage
+data:
+  application.yml: |
+    unity:
+      companyUrl: https://wsgw2.uat.omnitracs.com/omnionemigration/companies?api_key=txzu2auqu4pcmbgagzyhwek2
+      grantAppToCompanyUrl: https://wsgw2.uat.omnitracs.com/omnionemigration/apps/companies?api_key=txzu2auqu4pcmbgagzyhwek2
+      linkedCompanyAccountUrl: https://wsgw2.uat.omnitracs.com/omnionemigration/companies/accounts?api_key=txzu2auqu4pcmbgagzyhwek2
+      deviceUrl: https://wsgw2.uat.omnitracs.com/omnionemigration/devices?api_key=txzu2auqu4pcmbgagzyhwek2
+      deviceAliasUrl: https://wsgw2.uat.omnitracs.com/omnionemigration/devices/aliases?api_key=txzu2auqu4pcmbgagzyhwek2
+      deviceAttributeUrl: https://wsgw2.uat.omnitracs.com/omnionemigration/devices/attributes?api_key=txzu2auqu4pcmbgagzyhwek2
+      deviceAppsUrl: https://wsgw2.uat.omnitracs.com/omnionemigration/apps/devices?api_key=txzu2auqu4pcmbgagzyhwek2
+      appcatCategoryUrl: https://wsgw2.uat.omnitracs.com/omnionemigration/appcats/categories?api_key=txzu2auqu4pcmbgagzyhwek2
+      appcatElementUrl: https://wsgw2.uat.omnitracs.com/omnionemigration/appcats?api_key=txzu2auqu4pcmbgagzyhwek2
+      appcatValueUrl: https://wsgw2.uat.omnitracs.com/omnionemigration/appcats/values?api_key=txzu2auqu4pcmbgagzyhwek2
+      deviceGroupUrl: https://wsgw2.uat.omnitracs.com/omnionemigration/devicegroups?api_key=txzu2auqu4pcmbgagzyhwek2
+      deviceGroupMemberUrl: https://wsgw2.uat.omnitracs.com/omnionemigration/devicegroups/members?api_key=txzu2auqu4pcmbgagzyhwek2
+      deviceGroupAppsUrl: https://wsgw2.uat.omnitracs.com/omnionemigration/apps/devicegroups?api_key=txzu2auqu4pcmbgagzyhwek2
+      applicationUrl: https://wsgw2.uat.omnitracs.com/omnionemigration/apps?api_key=txzu2auqu4pcmbgagzyhwek2
+      applicationAttributeUrl: https://wsgw2.uat.omnitracs.com/omnionemigration/apps/attributes?api_key=txzu2auqu4pcmbgagzyhwek2
+      mdmProfileUrl: https://wsgw2.uat.omnitracs.com/omnionemigration/apps/mdmprofiles?api_key=txzu2auqu4pcmbgagzyhwek2
+      configAttributeUrl: https://wsgw2.uat.omnitracs.com/omnionemigration/config/attributes?api_key=txzu2auqu4pcmbgagzyhwek2
+      tokenUrl: https://wsgw2.uat.omnitracs.com/omnionemigration/tokens?api_key=txzu2auqu4pcmbgagzyhwek2
+    spring:
+      application:
+        name: device-scheduler
+      datasource-integration:
+        jdbcUrl: ${postgresUrl:jdbc:postgresql://ot1v3-device-stage.cluster-cjl2gnocvm2k.us-east-1.rds.amazonaws.com:5432/device_integration_service}
+        username: ${spring.datasource.username}
+        password: ${spring.datasource.password}
+        liquibase:
+          enabled: false
+      datasource-device:
+        jdbcUrl: ${postgresUrl:jdbc:postgresql://ot1v3-device-stage.cluster-cjl2gnocvm2k.us-east-1.rds.amazonaws.com:5432/device_service}
+        username: ${spring.datasource.username}
+        password: ${spring.datasource.password}
+      datasource-appcat:
+        jdbcUrl: ${postgresUrl:jdbc:postgresql://ot1v3-device-stage.cluster-cjl2gnocvm2k.us-east-1.rds.amazonaws.com:5432/appcat_service}
+        username: ${spring.datasource.username}
+        password: ${spring.datasource.password}
+      datasource-vehicle:
+        jdbcUrl: ${postgresUrl:jdbc:postgresql://ot1v3-device-stage.cluster-cjl2gnocvm2k.us-east-1.rds.amazonaws.com:5432/device_vehicle_service}
+        username: ${spring.datasource.username}
+        password: ${spring.datasource.password}
+      jpa:
+        database-platform: org.hibernate.dialect.PostgreSQL95Dialect
+        open-in-view: false
+        properties:
+          hibernate:
+            jdbc:
+              batch_size: 50
+              fetch_size: 200
+              time_zone: UTC
+            order_inserts: true
+            order_updates: true
+    server:
+      port: 8081
+    management:
+      endpoint:
+        prometheus:
+          enabled: true
+      health:
+        vault:
+          enabled: false
+      endpoints:
+        web:
+          exposure:
+            include: '*'
+  bootstrap.yml: >
+    spring:
+      application:
+        name: device-scheduler
+      cloud:
+        vault:
+          authentication: KUBERNETES
+          kubernetes:
+            role: default
+            kubernetes-path: kubernetes/dc11-stage-01/devices-stage-vault-auth
+            service-account-token-file: /var/run/secrets/kubernetes.io/serviceaccount/token
+          host: omni-prod-vault.aws.omnitracs.com
+          port: 8200
+          scheme: https
+          fail-fast: true
+          uri: https://omni-prod-vault.aws.omnitracs.com:8200
+          connection-timeout: 5000
+          read-timeout: 15000
+          enabled: true
+    vault:
+      path: secret/data/product/platform/stage/device-service      

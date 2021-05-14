@@ -1,0 +1,15 @@
+spring:
+  application:
+    name: device-integration-service
+  cloud:
+    vault:
+      authentication: TOKEN
+      token: mytoken
+      host: omni-dev-vault.aws.omnitracs.com
+      port: 8200
+      scheme: https
+      fail-fast: true
+      uri: https://omni-dev-vault.aws.omnitracs.com:8200
+      connection-timeout: 5000
+      read-timeout: 15000
+      enabled: true

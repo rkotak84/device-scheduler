@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+	<include resource="org/springframework/boot/logging/logback/defaults.xml" />
+	<property name="LOG_PATH" value="logs" />
+	<appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
+		<layout class="ch.qos.logback.classic.PatternLayout">
+			<pattern>%d{yyyy-MM-dd} | %d{HH:mm:ss.SSS} | %-20.20thread | %5p | %-25.25logger{25} | Trace_ID: %X{dd.trace_id:-0}, Span_ID: %X{dd.span_id:-0} | %m%n</pattern>
+		</layout>
+	</appender>
+	<root level="info">
+		<appender-ref ref="STDOUT" />
+	</root>
+</configuration>

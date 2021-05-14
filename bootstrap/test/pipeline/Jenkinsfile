@@ -1,0 +1,107 @@
+#!/usr/bin/groovy
+pipeline {
+   agent { label 'master'}
+  
+
+    environment {
+        CONTEXT_NAME = "devices"
+        APP_NAME = "device-scheduler"
+
+        ENVIRONMENT_NAME = "test"
+        CI_CD_NAMESPACE = "${CONTEXT_NAME}-ci-cd"
+        TEST_NAMESPACE = "${CONTEXT_NAME}-${ENVIRONMENT_NAME}"
+        DEV_REPO_KEY = "dev-images"
+        TEST_REPO_KEY = "${ENVIRONMENT_NAME}-images"
+        TEST_ARTIFACTORY_REPO = "omnitracs-${TEST_REPO_KEY}.jfrog.io"
+        ARTIFACTORY_FOLDER = "platform"
+        ARTIFACTORY_SECRET_NAME = "${CI_CD_NAMESPACE}-artifactory-access-token"
+        IMAGE_VERSION_TAG = "latest"
+    }
+
+    options {
+        buildDiscarder(logRotator(numToKeepStr:'10'))
+        timeout(time: 60, unit: 'MINUTES')
+        // ansiColor('xterm')
+        // timestamps()
+    }
+
+   stages{ 
+        stage("Promote to Test"){
+            steps{
+                script { 
+                    timeout(10) { // in minutes
+                        openshift.loglevel(3)
+                        openshift.withCluster () {
+                            // ARTIFACTORY PROMOTE: Service
+                            // input tag -> input tag
+                            def promotionArgsMapService = [
+                            	artifactorySecretName: "${ARTIFACTORY_SECRET_NAME}", 
+                            	dockerRepository: "${ARTIFACTORY_FOLDER}/${APP_NAME}", 
+                            	targetRepo: "${TEST_REPO_KEY}", 
+                            	sourceRepo: "${DEV_REPO_KEY}", 
+                            	targetTag: "${IMAGE_VERSION_TAG}", 
+                            	sourceTag: "${IMAGE_VERSION_TAG}", 
+                            	copy: true]
+                            if (promoteArtifactoryDockerImage(promotionArgsMapService) != 200){
+                               error("Service promotion to ${IMAGE_VERSION_TAG} failed.")
+                            }
+
+                            // input tag -> latest
+                            promotionArgsMapService['targetTag'] = "latest"
+                            if (promoteArtifactoryDockerImage(promotionArgsMapService) != 200){
+                                error("Service promotion to latest failed.")
+                            }
+                            
+                            // OPENSHIFT TAG: Service & Proxy
+                            // Artifactory latest -> ImageStream latest
+							openshift.withCluster() {
+								openshift.withProject("${TEST_NAMESPACE}") {
+									openshift.tag( "${TEST_ARTIFACTORY_REPO}/${ARTIFACTORY_FOLDER}/${APP_NAME}:${IMAGE_VERSION_TAG} ${TEST_NAMESPACE}/${APP_NAME}:${IMAGE_VERSION_TAG}" )
+								}
+							}
+                        }
+                    }
+                }
+            }
+        }
+
+        stage("Deploy to Test") {
+            steps {
+                script {
+					openshift.withCluster() {
+						openshift.withProject("${TEST_NAMESPACE}") {
+							openshift.raw("apply -f ${env.WORKSPACE}/bootstrap/${ENVIRONMENT_NAME}/application")
+						}
+					}
+                }
+            }
+        }
+
+        stage("Verify Test Deployment"){
+            steps{
+                script {
+                    timeout(10) { // in minutes
+                        // Sometimes the build fails inside verifyDeployment() because it claims the RC doesn't exist, even though it had just found the latest version and
+                        // echoed the RC instance. I haven't found a way to consistently reproduce this, but my best guess as to why it's happening is a race condition, so
+                        // I'm adding a preliminary sleep here to hopefully avoid it.   - npruis, 12/09/2019
+                        sleep 10
+
+                        verifyDeployment("${APP_NAME}", "${TEST_NAMESPACE}")
+                    }
+                }
+            }
+        }
+    }
+	
+	post {
+		success {
+		  echo "Success"
+		  slackSend color: "good", message: ":success: ${APP_NAME} Deployed to ${ENVIRONMENT_NAME} environment successfully !! - ${JOB_NAME} ${BUILD_NUMBER}"
+		}
+
+		failure {
+		  echo "Failed"
+		  slackSend color: "warning", message: ":failure: ${APP_NAME} Deployment Failed in ${ENVIRONMENT_NAME} environment! - ${JOB_NAME} ${BUILD_NUMBER}"
+		}
+	}
+}

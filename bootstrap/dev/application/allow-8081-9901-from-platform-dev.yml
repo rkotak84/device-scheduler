@@ -1,0 +1,19 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-8081-9901-from-platform-dev
+  namespace: devices
+spec:
+  ingress:
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          project: platform-dev
+    ports:
+    - port: 9901
+      protocol: TCP
+    - port: 8081
+      protocol: TCP
+  podSelector: {}
+  policyTypes:
+  - Ingress

@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+	<modelVersion>4.0.0</modelVersion>
+
+	<parent>
+		<groupId>com.omnitracs.platform</groupId>
+		<artifactId>device-parent-pom</artifactId>
+		<version>6.1.1</version>
+	</parent>
+
+	<artifactId>device-scheduler</artifactId>
+	<version>6.1.1</version>
+
+	<properties>
+		<sonar.exclusions>**/interceptor/*, **/*SchedulerApplication.java</sonar.exclusions>
+		<device-common-utility.version>6.1.1</device-common-utility.version>
+	</properties>
+
+	<dependencies>
+
+		<dependency>
+			<groupId>com.omnitracs.platform</groupId>
+			<artifactId>device-common-utility</artifactId>
+			<version>${device-common-utility.version}</version>
+		</dependency>
+	</dependencies>
+
+	<build>
+		<plugins>
+			<plugin>
+				<groupId>org.springframework.boot</groupId>
+				<artifactId>spring-boot-maven-plugin</artifactId>
+				<configuration>
+					<mainClass>com.omnitracs.platform.device.scheduler.SchedulerApplication</mainClass>
+				</configuration>
+				<executions>
+					<execution>
+						<goals>
+							<goal>repackage</goal>
+						</goals>
+					</execution>
+				</executions>
+			</plugin>	
+		</plugins>
+	</build>
+
+</project>

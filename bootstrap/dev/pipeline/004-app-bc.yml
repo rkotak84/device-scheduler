@@ -1,0 +1,42 @@
+kind: BuildConfig
+apiVersion: build.openshift.io/v1
+metadata:
+  name: device-scheduler
+  namespace: devices-ci-cd
+  labels:
+    app: device-scheduler
+    build: device-scheduler
+    name: device-scheduler-pipeline
+    template: s2i-app-build-template
+    type: image
+spec:
+  nodeSelector: null
+  output:
+    to:
+      kind: DockerImage
+      name: >-
+        omnitracs-dev-images.jfrog.io/platform/device-scheduler:latest
+    pushSecret:
+      name: artifactory
+  resources:
+    limits:
+      cpu: '1'
+      memory: 768Mi
+    requests:
+      cpu: 500m
+      memory: 256Mi
+  successfulBuildsHistoryLimit: 5
+  failedBuildsHistoryLimit: 5
+  strategy:
+    type: Source
+    sourceStrategy:
+      from:
+        kind: ImageStreamTag
+        namespace: openshift
+        name: 'redhat-openjdk18-openshift:1.8'
+  postCommit: {}
+  source:
+    type: Binary
+    binary: {}
+  triggers: []
+  runPolicy: Serial

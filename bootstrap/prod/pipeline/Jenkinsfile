@@ -1,0 +1,110 @@
+#!/usr/bin/groovy
+pipeline {
+   agent { label 'master'}
+  
+
+    environment {
+        CONTEXT_NAME = "devices"
+        APP_NAME = "device-scheduler"
+
+        ENVIRONMENT_NAME = "prod"
+        CI_CD_NAMESPACE = "${CONTEXT_NAME}-ci-cd"
+        NAMESPACE = "${CONTEXT_NAME}"
+        STAGE_REPO_KEY = "stage-images"
+        PROD_REPO_KEY = "${ENVIRONMENT_NAME}-images"
+        PROD_ARTIFACTORY_REPO = "omnitracs-${PROD_REPO_KEY}.jfrog.io"
+        ARTIFACTORY_FOLDER = "platform"
+        ARTIFACTORY_SECRET_NAME = "${CI_CD_NAMESPACE}-artifactory-access-token"
+		
+		GIT_USER = "ot1jenkins"
+        GIT_EMAIL = "${GIT_USER}@omnitracs.com"
+
+        SSH_SECRET_NAME = "${CI_CD_NAMESPACE}-jenkins-github-ssh"
+		
+		IMAGE_VERSION_TAG = "latest"
+    }
+
+    options {
+        buildDiscarder(logRotator(numToKeepStr:'5'))
+        timeout(time: 60, unit: 'MINUTES')
+        // ansiColor('xterm')
+        // timestamps()
+    }
+
+   stages{ 
+        stage("Promote to Prod"){
+            steps{
+                script { 
+                    timeout(10) { // in minutes
+                        openshift.loglevel(3)
+                        openshift.withCluster () {
+                            // ARTIFACTORY PROMOTE: Service
+                            // input tag -> input tag
+                            def promotionArgsMapService = [
+                            	artifactorySecretName: "${ARTIFACTORY_SECRET_NAME}", 
+                            	dockerRepository: "${ARTIFACTORY_FOLDER}/${APP_NAME}", 
+                            	targetRepo: "${PROD_REPO_KEY}", 
+                            	sourceRepo: "${STAGE_REPO_KEY}", 
+                            	targetTag: "${IMAGE_VERSION_TAG}", 
+                            	sourceTag: "${IMAGE_VERSION_TAG}", 
+                            	copy: true]
+                            if (promoteArtifactoryDockerImage(promotionArgsMapService) != 200){
+                               error("Service promotion to ${IMAGE_VERSION_TAG} failed.")
+                            }
+
+                            // input tag -> latest
+                            promotionArgsMapService['targetTag'] = "${IMAGE_VERSION_TAG}"
+                            if (promoteArtifactoryDockerImage(promotionArgsMapService) != 200){
+                                error("Service promotion to latest failed.")
+                            }
+
+
+                            // OPENSHIFT TAG: Service & Proxy
+                            // Artifactory latest -> ImageStream latest
+							openshift.withCluster() {
+								openshift.withProject("${NAMESPACE}") {
+									openshift.tag( "${PROD_ARTIFACTORY_REPO}/${ARTIFACTORY_FOLDER}/${APP_NAME}:${IMAGE_VERSION_TAG} ${NAMESPACE}/${APP_NAME}:latest" )
+								}
+							}
+                        }
+                    }
+                }
+            }
+        }
+
+        stage("Deploy to Prod") {
+            steps {
+                script {
+					openshift.withCluster() {
+						openshift.withProject("${NAMESPACE}") {
+							openshift.raw("apply -f ${env.WORKSPACE}/bootstrap/${ENVIRONMENT_NAME}/application")
+						}
+					}
+                }
+            }
+        }
+
+        stage("Verify Prod Deployment"){
+            steps{
+                script {
+                    timeout(10) { // in minutes
+                        sleep 10
+                        verifyDeployment("${APP_NAME}", "${NAMESPACE}")
+                    }
+                }
+            }
+        }
+    }
+	
+	post {
+		success {
+		  echo "Success"
+		  slackSend color: "good", message: ":success: ${APP_NAME} Deployed to ${ENVIRONMENT_NAME} environment successfully !! - ${JOB_NAME} ${BUILD_NUMBER}"
+		}
+
+		failure {
+		  echo "Failed"
+		  slackSend color: "warning", message: ":failure: ${APP_NAME} Deployment Failed in ${ENVIRONMENT_NAME} environment! - ${JOB_NAME} ${BUILD_NUMBER}"
+		}
+	}
+}

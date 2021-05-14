@@ -1,0 +1,1 @@
+org.springframework.cloud.bootstrap.BootstrapConfiguration=com.omnitracs.platform.device.grpc.vault.CustomConfiguration

@@ -1,0 +1,104 @@
+#!/usr/bin/groovy
+pipeline {
+    agent { label 'master'}
+
+    environment {
+        CONTEXT_NAME = "devices"
+        APP_NAME = "device-scheduler"
+
+        TEST_ENVIRONMENT_NAME = "test"
+        PERF_ENVIRONMENT_NAME = "perf"
+        CI_CD_NAMESPACE = "${CONTEXT_NAME}-ci-cd"
+        TEST_NAMESPACE = "${CONTEXT_NAME}-${TEST_ENVIRONMENT_NAME}"
+        PERF_NAMESPACE = "${CONTEXT_NAME}-${PERF_ENVIRONMENT_NAME}"
+        TEST_REPO_KEY = "${TEST_ENVIRONMENT_NAME}-images"
+        PERF_REPO_KEY = "${PERF_ENVIRONMENT_NAME}-images"
+        TEST_ARTIFACTORY_REPO = "omnitracs-${TEST_REPO_KEY}.jfrog.io"
+        PERF_ARTIFACTORY_REPO = "omnitracs-${PERF_REPO_KEY}.jfrog.io"
+        ARTIFACTORY_FOLDER = "platform"
+        ARTIFACTORY_SECRET_NAME = "${CI_CD_NAMESPACE}-artifactory-access-token"
+        IMAGE_VERSION_TAG = "latest"
+    }
+
+    options {
+        buildDiscarder(logRotator(numToKeepStr:'5'))
+        timeout(time: 60, unit: 'MINUTES')
+        // ansiColor('xterm')
+        // timestamps()
+    }
+
+   stages{
+        stage("Promote to Perf"){
+            steps{
+                script {
+                    timeout(10) { // in minutes
+                        openshift.loglevel(3)
+                        openshift.withCluster () {
+                            // ARTIFACTORY PROMOTE: Service
+                            // input tag -> input tag
+                            def promotionArgsMapService = [
+                                artifactorySecretName: "${ARTIFACTORY_SECRET_NAME}",
+                                dockerRepository: "${ARTIFACTORY_FOLDER}/${APP_NAME}",
+                                targetRepo: "${PERF_REPO_KEY}",
+                                sourceRepo: "${TEST_REPO_KEY}",
+                                targetTag: "${IMAGE_VERSION_TAG}",
+                                sourceTag: "${IMAGE_VERSION_TAG}",
+                                copy: true]
+
+                            if (promoteArtifactoryDockerImage(promotionArgsMapService) != 200){
+                               error("Service promotion to ${IMAGE_VERSION_TAG} failed.")
+                            }
+
+                            // input tag -> latest
+                            promotionArgsMapService['targetTag'] = "latest"
+                            if (promoteArtifactoryDockerImage(promotionArgsMapService) != 200){
+                                error("Service promotion to latest failed.")
+                            }
+
+                            // OPENSHIFT TAG: Service & Proxy
+                            // Artifactory latest -> ImageStream latest
+                            openshift.withProject("${PERF_NAMESPACE}") {
+                                openshift.tag( "${PERF_ARTIFACTORY_REPO}/${ARTIFACTORY_FOLDER}/${APP_NAME}:${IMAGE_VERSION_TAG} ${PERF_NAMESPACE}/${APP_NAME}:${IMAGE_VERSION_TAG}" )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        stage("Deploy to Perf") {
+            steps {
+                script {
+                    openshift.withCluster() {
+                        openshift.withProject("${PERF_NAMESPACE}") {
+                            openshift.raw("apply -f ${env.WORKSPACE}/bootstrap/perf/application")
+                        }
+                    }
+                }
+            }
+        }
+
+        stage("Verify Perf Deployment"){
+            steps{
+                script {
+                    timeout(10) { 
+                        sleep 10
+                        verifyDeployment("${APP_NAME}", "${PERF_NAMESPACE}")
+                    }
+                }
+            }
+        }
+    }
+	
+	post {
+		success {
+		  echo "Success"
+		  slackSend color: "good", message: ":success: ${APP_NAME} Build Completed Successfully !! - ${JOB_NAME} ${BUILD_NUMBER} (<${BUILD_URL}|Open>)"
+		}
+
+		failure {
+		  echo "Failed"
+		  slackSend color: "warning", message: ":failure: ${APP_NAME} Build Failed! - ${JOB_NAME} ${BUILD_NUMBER} (<${BUILD_URL}console|Open>)"
+		}
+	}
+}

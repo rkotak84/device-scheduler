@@ -1,0 +1,7 @@
+kind: ServiceAccount
+apiVersion: v1
+imagePullSecrets:
+- name: baseimagepull-registry-creds
+metadata:
+  name: vault-auth
+  namespace: devices-perf

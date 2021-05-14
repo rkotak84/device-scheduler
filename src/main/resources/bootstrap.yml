@@ -1,0 +1,3 @@
+spring.application.name: device-integration-service
+spring.cloud.vault:
+  enabled: false

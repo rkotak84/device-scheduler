@@ -1,0 +1,51 @@
+unity:
+  companyUrl: https://wsgw2.dev.omnitracs.com/omnionemigration/companies?api_key=txzu2auqu4pcmbgagzyhwek2
+  grantAppToCompanyUrl: https://wsgw2.dev.omnitracs.com/omnionemigration/apps/companies?api_key=txzu2auqu4pcmbgagzyhwek2
+  linkedCompanyAccountUrl: https://wsgw2.dev.omnitracs.com/omnionemigration/companies/accounts?api_key=txzu2auqu4pcmbgagzyhwek2
+  deviceUrl: https://wsgw2.dev.omnitracs.com/omnionemigration/devices?api_key=txzu2auqu4pcmbgagzyhwek2
+  deviceAliasUrl: https://wsgw2.dev.omnitracs.com/omnionemigration/devices/aliases?api_key=txzu2auqu4pcmbgagzyhwek2
+  deviceAttributeUrl: https://wsgw2.dev.omnitracs.com/omnionemigration/devices/attributes?api_key=txzu2auqu4pcmbgagzyhwek2
+  deviceAppsUrl: https://wsgw2.dev.omnitracs.com/omnionemigration/apps/devices?api_key=txzu2auqu4pcmbgagzyhwek2
+  appcatCategoryUrl: https://wsgw2.dev.omnitracs.com/omnionemigration/appcats/categories?api_key=txzu2auqu4pcmbgagzyhwek2
+  appcatElementUrl: https://wsgw2.dev.omnitracs.com/omnionemigration/appcats?api_key=txzu2auqu4pcmbgagzyhwek2
+  appcatValueUrl: https://wsgw2.dev.omnitracs.com/omnionemigration/appcats/values?api_key=txzu2auqu4pcmbgagzyhwek2
+  deviceGroupUrl: https://wsgw2.dev.omnitracs.com/omnionemigration/devicegroups?api_key=txzu2auqu4pcmbgagzyhwek2
+  deviceGroupMemberUrl: https://wsgw2.dev.omnitracs.com/omnionemigration/devicegroups/members?api_key=txzu2auqu4pcmbgagzyhwek2
+  deviceGroupAppsUrl: https://wsgw2.dev.omnitracs.com/omnionemigration/apps/devicegroups?api_key=txzu2auqu4pcmbgagzyhwek2
+  applicationUrl: https://wsgw2.dev.omnitracs.com/omnionemigration/apps?api_key=txzu2auqu4pcmbgagzyhwek2
+  applicationAttributeUrl: https://wsgw2.dev.omnitracs.com/omnionemigration/apps/attributes?api_key=txzu2auqu4pcmbgagzyhwek2
+  mdmProfileUrl: https://wsgw2.dev.omnitracs.com/omnionemigration/apps/mdmprofiles?api_key=txzu2auqu4pcmbgagzyhwek2
+  configAttributeUrl: https://wsgw2.dev.omnitracs.com/omnionemigration/config/attributes?api_key=txzu2auqu4pcmbgagzyhwek2
+  tokenUrl: https://wsgw2.dev.omnitracs.com/omnionemigration/tokens?api_key=txzu2auqu4pcmbgagzyhwek2
+spring:
+  liquibase:
+    enabled: false
+  datasource-integration:
+    jdbcUrl: jdbc:postgresql://localhost:5432/postgresintegration
+    username: postgres
+    password: 12345
+  datasource-device:
+    jdbcUrl: jdbc:postgresql://localhost:5432/postgres-device
+    username: postgres
+    password: 12345
+  datasource-appcat:
+    jdbcUrl: jdbc:postgresql://localhost:5432/postgres-appcat
+    username: postgres
+    password: 12345
+  datasource-vehicle:
+    jdbcUrl: jdbc:postgresql://localhost:5432/postgress-vehicle
+    username: postgres
+    password: 12345
+  jpa:
+    database-platform: org.hibernate.dialect.PostgreSQL10Dialect
+grpc:
+  server:
+    port: 6532
+    security:
+      enabled: false
+  client:
+    device-integration-service:
+      address: static://localhost:6532
+      negotiationType: plaintext
+server:
+  port: 8082
